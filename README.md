@@ -10,7 +10,6 @@ Abra o PowerShell e cole:
 
 ```powershell
 irm https://raw.githubusercontent.com/Clebson-Torres/orbita/main/install.ps1 | iex
-
 ```
 
 O instalador:

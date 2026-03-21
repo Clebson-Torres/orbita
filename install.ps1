@@ -1,5 +1,5 @@
 # Script de instalação do Orbita
-# Uso: irm https://raw.githubusercontent.com/clebsonpy/orbita/main/install.ps1 | iex
+# Uso: irm https://raw.githubusercontent.com/Clebson-Torres/orbita/main/install.ps1 | iex
 
 $ErrorActionPreference = "Stop"
 
@@ -28,7 +28,7 @@ if ([version]$ver -lt [version]"3.12") {
 
 # ── 2. Instala o Orbita via pip ───────────────────────────────────
 Write-Step "Instalando Orbita..."
-& python -m pip install --quiet --upgrade git+https://github.com/clebsonpy/orbita
+& python -m pip install --quiet --upgrade git+https://github.com/Clebson-Torres/orbita.git
 if ($LASTEXITCODE -ne 0) { Write-Fail "Falha na instalação via pip." }
 Write-Ok "Orbita instalado"
 

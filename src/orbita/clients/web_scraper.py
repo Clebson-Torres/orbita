@@ -4,18 +4,19 @@ Não usa browser. Faz requisições HTTP diretas e parseia o conteúdo.
 É a forma mais rápida e leve de extrair informações de sites.
 
 Dependências extras necessárias:
-    pip install beautifulsoup4 lxml
+    pip install beautifulsoup4
 
 Adicione ao pyproject.toml:
     "beautifulsoup4>=4.12,<5",
-    "lxml>=5.0,<6",
 """
 from __future__ import annotations
 
 import logging
+from html.parser import HTMLParser
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 from typing import Any
+from urllib.parse import urljoin
 
 import httpx
 
@@ -95,15 +96,18 @@ class WebScraperClient:
         try:
             from bs4 import BeautifulSoup  # type: ignore
 
-            soup = BeautifulSoup(response.content, "lxml")
+            soup = BeautifulSoup(response.content, "html.parser")
             for tag in soup(["script", "style", "nav", "footer", "header", "aside"]):
                 tag.decompose()
             text = soup.get_text(separator="\n", strip=True)
             lines = [ln for ln in text.splitlines() if ln.strip()]
             return "\n".join(lines[:200])
         except ImportError:
-            logger.warning("beautifulsoup4 não instalado — retornando HTML bruto truncado")
-            return response.text[:4000]
+            logger.warning("beautifulsoup4 não instalado — usando parser HTML nativo")
+            parser = _TextExtractor()
+            parser.feed(response.text)
+            text = "\n".join(line for line in parser.lines if line.strip())
+            return text[:4000]
 
     async def fetch_headlines(self, url: str, max_items: int = 10) -> list[NewsItem]:
         """Extrai manchetes de qualquer página HTML (heurística).
@@ -117,7 +121,7 @@ class WebScraperClient:
         try:
             from bs4 import BeautifulSoup  # type: ignore
 
-            soup = BeautifulSoup(response.content, "lxml")
+            soup = BeautifulSoup(response.content, "html.parser")
             items: list[NewsItem] = []
 
             for tag in soup.find_all(["h1", "h2", "h3"], limit=max_items * 2):
@@ -127,7 +131,6 @@ class WebScraperClient:
                 anchor = tag.find("a") or tag.find_parent("a")
                 link = anchor.get("href", "") if anchor else ""
                 if link and not link.startswith("http"):
-                    from urllib.parse import urljoin
                     link = urljoin(url, link)
                 items.append(NewsItem(title=title, link=link))
                 if len(items) >= max_items:
@@ -135,8 +138,10 @@ class WebScraperClient:
 
             return items
         except ImportError:
-            logger.warning("beautifulsoup4 não instalado")
-            return []
+            logger.warning("beautifulsoup4 não instalado — usando parser HTML nativo")
+            parser = _HeadlineExtractor(url, max_items=max_items)
+            parser.feed(response.text)
+            return parser.items
 
     # ------------------------------------------------------------------
     # Feeds conhecidos — atalhos prontos
@@ -233,3 +238,67 @@ class WebScraperClient:
         if el is None:
             return ""
         return (el.text or "").strip()
+
+
+class _TextExtractor(HTMLParser):
+    def __init__(self) -> None:
+        super().__init__()
+        self._skip_depth = 0
+        self.lines: list[str] = []
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        if tag in {"script", "style", "nav", "footer", "header", "aside"}:
+            self._skip_depth += 1
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag in {"script", "style", "nav", "footer", "header", "aside"} and self._skip_depth > 0:
+            self._skip_depth -= 1
+
+    def handle_data(self, data: str) -> None:
+        if self._skip_depth:
+            return
+        text = data.strip()
+        if text:
+            self.lines.append(text)
+
+
+class _HeadlineExtractor(HTMLParser):
+    def __init__(self, base_url: str, max_items: int = 10) -> None:
+        super().__init__()
+        self.base_url = base_url
+        self.max_items = max_items
+        self.items: list[NewsItem] = []
+        self._current_heading: str | None = None
+        self._current_link: str = ""
+        self._text_buffer: list[str] = []
+        self._anchor_stack: list[str] = []
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        attrs_dict = dict(attrs)
+        if tag in {"h1", "h2", "h3"}:
+            self._current_heading = tag
+            self._text_buffer = []
+            self._current_link = ""
+        elif tag == "a" and self._current_heading:
+            href = attrs_dict.get("href") or ""
+            self._anchor_stack.append(href)
+            if href and not self._current_link:
+                self._current_link = href
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag == "a" and self._anchor_stack:
+            self._anchor_stack.pop()
+        if tag == self._current_heading and self._current_heading:
+            title = " ".join(part.strip() for part in self._text_buffer if part.strip()).strip()
+            if len(title) >= 20 and len(self.items) < self.max_items:
+                link = self._current_link
+                if link and not link.startswith("http"):
+                    link = urljoin(self.base_url, link)
+                self.items.append(NewsItem(title=title, link=link))
+            self._current_heading = None
+            self._text_buffer = []
+            self._current_link = ""
+
+    def handle_data(self, data: str) -> None:
+        if self._current_heading:
+            self._text_buffer.append(data)

@@ -23,7 +23,6 @@ dependencies = [
   "pydantic-settings>=2.3,<3",
   "typer>=0.12,<1",
   "beautifulsoup4>=4.12,<5",
-  "lxml>=5.0,<6",
 ]
 
 [project.optional-dependencies]
@@ -37,9 +36,9 @@ browser = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/clebsonpy/orbita"
-Repository = "https://github.com/clebsonpy/orbita"
-Issues = "https://github.com/clebsonpy/orbita/issues"
+Homepage = "https://github.com/Clebson-Torres/orbita"
+Repository = "https://github.com/Clebson-Torres/orbita"
+Issues = "https://github.com/Clebson-Torres/orbita/issues"
 
 [tool.setuptools]
 package-dir = {"" = "src"}

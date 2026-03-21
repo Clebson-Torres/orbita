@@ -150,3 +150,10 @@ def test_setup_writes_env(tmp_path: Path):
         )
 
     assert "TELEGRAM_BOT_TOKEN=meu-token-123" in env_path.read_text(encoding="utf-8") or result.exit_code in (0, 1)
+
+
+def test_install_script_uses_current_repository_url():
+    install_script = Path("install.ps1").read_text(encoding="utf-8")
+
+    assert "https://github.com/Clebson-Torres/orbita.git" in install_script
+    assert "clebsonpy/orbita" not in install_script
