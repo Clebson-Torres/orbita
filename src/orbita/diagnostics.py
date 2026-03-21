@@ -105,6 +105,23 @@ async def probe_lmstudio(base_url: str, api_token: str = "") -> dict[str, Any]:
         try:
             response = await client.get(f"{base_url.rstrip('/')}/api/v1/models", headers=headers)
             response.raise_for_status()
+        except httpx.HTTPStatusError as exc:
+            code = exc.response.status_code
+            if code == 401:
+                return {
+                    "name": "lmstudio",
+                    "ok": False,
+                    "code": 401,
+                    "message": "LM Studio requer autenticacao por token. Use Server Settings > Manage Tokens.",
+                    "models": [],
+                }
+            return {
+                "name": "lmstudio",
+                "ok": False,
+                "code": code,
+                "message": f"LM Studio respondeu com erro HTTP {code}: {exc}",
+                "models": [],
+            }
         except httpx.HTTPError as exc:
             return {"name": "lmstudio", "ok": False, "message": f"LM Studio not reachable: {exc}", "models": []}
 

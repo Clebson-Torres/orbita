@@ -118,6 +118,23 @@ def _choose_model(default: str, models: list[str]) -> str:
     return typer.prompt("  Modelo a usar", default=best_default)
 
 
+def _resolve_lmstudio_token(existing: dict[str, str], lmstudio_url: str) -> tuple[str, dict[str, Any]]:
+    api_token = existing.get("LMSTUDIO_API_TOKEN", "")
+    result = probe_lmstudio(lmstudio_url, api_token)
+    if result.get("code") != 401:
+        return api_token, result
+
+    typer.echo("  LM Studio requer autenticacao para consultar os modelos.")
+    typer.echo("  Gere ou copie um token em Server Settings > Manage Tokens.")
+    api_token = typer.prompt(
+        "  LM Studio API token",
+        default=api_token,
+        hide_input=True,
+    ).strip()
+    result = probe_lmstudio(lmstudio_url, api_token)
+    return api_token, result
+
+
 # ------------------------------------------------------------------
 # Probes síncronos
 # ------------------------------------------------------------------
@@ -232,7 +249,7 @@ def setup(
         "  URL do LM Studio",
         default=existing.get("LMSTUDIO_BASE_URL", DEFAULT_LMSTUDIO_URL),
     )
-    lm_result = probe_lmstudio(lmstudio_url, existing.get("LMSTUDIO_API_TOKEN", ""))
+    lmstudio_api_token, lm_result = _resolve_lmstudio_token(existing, lmstudio_url)
     _ok(lm_result)
     lmstudio_model = _choose_model(
         existing.get("LMSTUDIO_MODEL", "qwen3:4b"),
@@ -291,7 +308,7 @@ def setup(
         "BOT_DEFAULT_BACKEND":        default_backend,
         "BOT_DATA_DIR":               existing.get("BOT_DATA_DIR", data_dir),
         "LMSTUDIO_BASE_URL":          lmstudio_url,
-        "LMSTUDIO_API_TOKEN":         existing.get("LMSTUDIO_API_TOKEN", ""),
+        "LMSTUDIO_API_TOKEN":         lmstudio_api_token,
         "LMSTUDIO_MODEL":             lmstudio_model,
         "LMSTUDIO_MCP_MODE":          mcp_mode,
         "LMSTUDIO_MCP_PLUGIN_ID":     mcp_plugin_id,

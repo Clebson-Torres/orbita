@@ -151,6 +151,61 @@ def test_setup_writes_env(tmp_path: Path):
     assert "TELEGRAM_BOT_TOKEN=meu-token-123" in env_path.read_text(encoding="utf-8") or result.exit_code in (0, 1)
 
 
+def test_setup_prompts_for_lmstudio_token_after_401(tmp_path: Path):
+    env_path = tmp_path / ".env"
+
+    fake_lmstudio_unauthorized = {
+        "name": "lmstudio",
+        "ok": False,
+        "code": 401,
+        "message": "LM Studio requer token de API",
+        "models": [],
+    }
+    fake_lmstudio_ok = {
+        "name": "lmstudio",
+        "ok": True,
+        "message": "LM Studio online",
+        "models": ["qwen3:4b"],
+    }
+    fake_mcp = {"name": "mcp", "ok": True, "message": "Windows-MCP ready"}
+    fake_ollama = {"name": "ollama", "ok": True, "message": "Ollama online"}
+    fake_identity = {"id": 1, "username": "desktop_bot"}
+    fake_user = {"user_id": 999, "chat_id": 555}
+    fake_doctor = [
+        {"name": "python", "ok": True, "message": "Python 3.14"},
+        {"name": "telegram", "ok": True, "message": "@desktop_bot"},
+        {"name": "lmstudio", "ok": True, "message": "online"},
+        {"name": "mcp", "ok": True, "message": "ok"},
+        {"name": "ollama", "ok": True, "message": "online"},
+    ]
+
+    runner = CliRunner()
+    with (
+        patch("orbita.cli.detect_python_status", return_value={"ok": True, "message": "Python 3.14"}),
+        patch("orbita.cli.detect_install_mode", return_value="editable"),
+        patch("orbita.cli.detect_lmstudio_installation", return_value={"ok": True, "path": "C:/LM Studio.exe"}),
+        patch("orbita.cli.probe_lmstudio", side_effect=[fake_lmstudio_unauthorized, fake_lmstudio_ok]) as probe_mock,
+        patch("orbita.cli.probe_windows_mcp", return_value=fake_mcp),
+        patch("orbita.cli.probe_ollama", return_value=fake_ollama),
+        patch("orbita.cli._full_doctor", return_value=fake_doctor),
+        patch("orbita.cli.validate_telegram_token_async", new=AsyncMock(return_value=fake_identity)),
+        patch("orbita.cli.discover_telegram_user_async", new=AsyncMock(return_value=fake_user)),
+    ):
+        result = runner.invoke(
+            app,
+            ["setup", "--env-file", str(env_path)],
+            input="meu-token-123\n\nlmstudio-token-123\n\nN\n\n\n\n",
+        )
+
+    saved = env_path.read_text(encoding="utf-8")
+    assert result.exit_code == 0
+    assert "LMSTUDIO_API_TOKEN=lmstudio-token-123" in saved
+    assert "requer autenticacao" in result.stdout.lower()
+    assert probe_mock.call_count == 2
+    assert probe_mock.call_args_list[0].args == ("http://127.0.0.1:1234", "")
+    assert probe_mock.call_args_list[1].args == ("http://127.0.0.1:1234", "lmstudio-token-123")
+
+
 def test_choose_model_lists_available_models():
     with patch("orbita.cli.typer.echo") as echo_mock, patch(
         "orbita.cli.typer.prompt", return_value="qwen3:8b"
