@@ -1,0 +1,55 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "orbita"
+version = "0.1.0"
+description = "Controle seu PC Windows via Telegram com LLM local (Ollama / LM Studio)."
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.12"
+keywords = ["telegram", "bot", "llm", "ollama", "windows", "automation"]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Operating System :: Microsoft :: Windows",
+  "License :: OSI Approved :: MIT License",
+]
+dependencies = [
+  "httpx>=0.27,<1",
+  "pydantic>=2.7,<3",
+  "pydantic-settings>=2.3,<3",
+  "typer>=0.12,<1",
+  "beautifulsoup4>=4.12,<5",
+  "lxml>=5.0,<6",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.2,<9",
+  "anyio[trio]>=4.0,<5",
+  "pytest-anyio>=0.0.0",
+]
+browser = [
+  "playwright>=1.44,<2",
+]
+
+[project.urls]
+Homepage = "https://github.com/clebsonpy/orbita"
+Repository = "https://github.com/clebsonpy/orbita"
+Issues = "https://github.com/clebsonpy/orbita/issues"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+
+[project.scripts]
+orbita = "orbita.cli:main"

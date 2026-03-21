@@ -1,0 +1,18 @@
+# dados gerados em runtime
+data/
+*.log
+
+# env com credenciais reais — nunca versionar
+.env
+
+# arquivo temporário de verificação
+_check_syntax.py
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.venv/
