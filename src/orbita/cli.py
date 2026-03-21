@@ -56,6 +56,7 @@ app.add_typer(check_app, name="check")
 
 SECRET_KEYS = {"TELEGRAM_BOT_TOKEN", "LMSTUDIO_API_TOKEN"}
 RISK_ICON = {"read": "🟢", "write": "🟡", "exec": "🔴"}
+DEFAULT_RECOMMENDED_LMSTUDIO_MODEL = "qwen3:4b"
 
 # Padrão fixo — resolve na primeira chamada para garantir que APPDATA já está disponível
 def _default_env() -> Path:
@@ -104,8 +105,13 @@ def _maybe_install_uv() -> None:
 
 def _choose_model(default: str, models: list[str]) -> str:
     if not models:
-        return typer.prompt("  Modelo", default=default)
-    typer.echo("  Modelos detectados:")
+        recommended = default or DEFAULT_RECOMMENDED_LMSTUDIO_MODEL
+        typer.echo("  Nenhum modelo carregado no LM Studio.")
+        typer.echo(f"  Recomendado para comecar: {recommended}")
+        typer.echo("  Se tiver mais memoria disponivel, qwen3:8b costuma ser um bom passo seguinte.")
+        typer.echo("  Carregue um modelo no LM Studio ou informe o nome manualmente para continuar.")
+        return typer.prompt("  Modelo", default=recommended)
+    typer.echo("  Modelos detectados no LM Studio:")
     for i, m in enumerate(models, 1):
         typer.echo(f"    {i}. {m}")
     best_default = default if default in models else models[0]

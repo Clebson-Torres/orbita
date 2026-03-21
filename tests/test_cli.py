@@ -10,7 +10,7 @@ from unittest.mock import AsyncMock, patch
 
 from typer.testing import CliRunner
 
-from orbita.cli import app
+from orbita.cli import _choose_model, app
 
 
 # ------------------------------------------------------------------
@@ -138,9 +138,8 @@ def test_setup_writes_env(tmp_path: Path):
         patch("orbita.cli.probe_windows_mcp",         return_value=fake_mcp),
         patch("orbita.cli.probe_ollama",              return_value=fake_ollama),
         patch("orbita.cli._full_doctor",              return_value=fake_doctor),
-        patch("orbita.cli._run", side_effect=lambda coro: (
-            fake_identity if "validate" in str(coro) else fake_user
-        )),
+        patch("orbita.cli.validate_telegram_token_async", new=AsyncMock(return_value=fake_identity)),
+        patch("orbita.cli.discover_telegram_user_async", new=AsyncMock(return_value=fake_user)),
     ):
         result = runner.invoke(
             app,
@@ -150,6 +149,35 @@ def test_setup_writes_env(tmp_path: Path):
         )
 
     assert "TELEGRAM_BOT_TOKEN=meu-token-123" in env_path.read_text(encoding="utf-8") or result.exit_code in (0, 1)
+
+
+def test_choose_model_lists_available_models():
+    with patch("orbita.cli.typer.echo") as echo_mock, patch(
+        "orbita.cli.typer.prompt", return_value="qwen3:8b"
+    ) as prompt_mock:
+        chosen = _choose_model("qwen3:4b", ["qwen3:4b", "qwen3:8b"])
+
+    assert chosen == "qwen3:8b"
+    prompt_mock.assert_called_once_with("  Modelo a usar", default="qwen3:4b")
+
+    echoed = "\n".join(str(call.args[0]) for call in echo_mock.call_args_list)
+    assert "Modelos detectados no LM Studio:" in echoed
+    assert "1. qwen3:4b" in echoed
+    assert "2. qwen3:8b" in echoed
+
+
+def test_choose_model_recommends_model_when_none_loaded():
+    with patch("orbita.cli.typer.echo") as echo_mock, patch(
+        "orbita.cli.typer.prompt", return_value="qwen3:4b"
+    ) as prompt_mock:
+        chosen = _choose_model("qwen3:4b", [])
+
+    assert chosen == "qwen3:4b"
+    prompt_mock.assert_called_once_with("  Modelo", default="qwen3:4b")
+
+    echoed = "\n".join(str(call.args[0]) for call in echo_mock.call_args_list)
+    assert "Nenhum modelo carregado no LM Studio." in echoed
+    assert "Recomendado para comecar: qwen3:4b" in echoed
 
 
 def test_install_script_uses_current_repository_url():
