@@ -28,16 +28,20 @@ if ([version]$ver -lt [version]"3.12") {
 
 # ── 2. Instala o Orbita via pip ───────────────────────────────────
 Write-Step "Instalando Orbita..."
-& python -m pip install --quiet --upgrade git+https://github.com/Clebson-Torres/orbita.git
+& python -m pip install --quiet --disable-pip-version-check --no-warn-script-location --upgrade git+https://github.com/Clebson-Torres/orbita.git
 if ($LASTEXITCODE -ne 0) { Write-Fail "Falha na instalação via pip." }
 Write-Ok "Orbita instalado"
 
 # ── 3. Verifica se o comando 'orbita' está acessível ─────────────
 Write-Step "Verificando comando orbita..."
 $orbita = Get-Command orbita -ErrorAction SilentlyContinue
+$scriptsPath = & python -c "import sysconfig; print(sysconfig.get_path('scripts'))"
+$orbitaExePath = Join-Path $scriptsPath "orbita.exe"
+$setupCommand = "python -m orbita.cli setup"
+$runCommand = "python -m orbita.cli run"
+
 if (-not $orbita) {
     # Scripts do pip às vezes ficam fora do PATH — tenta adicionar
-    $scriptsPath = & python -c "import sysconfig; print(sysconfig.get_path('scripts'))"
     $env:PATH += ";$scriptsPath"
     [Environment]::SetEnvironmentVariable(
         "PATH",
@@ -45,9 +49,20 @@ if (-not $orbita) {
         "User"
     )
     Write-Host "  INFO Scripts adicionados ao PATH: $scriptsPath" -ForegroundColor Yellow
-    Write-Host "       Reinicie o terminal para que o PATH seja aplicado."
+    Write-Host "       O PATH do usuário foi atualizado; novos terminais já verão o comando 'orbita'."
+    if (Test-Path $orbitaExePath) {
+        Write-Host "       Neste terminal atual, você também pode usar:"
+        Write-Host "         & `"$orbitaExePath`" setup"
+        Write-Host "       ou, se preferir sem depender do PATH:"
+        Write-Host "         $setupCommand"
+    } else {
+        Write-Host "       Se o comando 'orbita' ainda não aparecer neste terminal, use:"
+        Write-Host "         $setupCommand"
+    }
 } else {
     Write-Ok "Comando 'orbita' disponível em $($orbita.Source)"
+    $setupCommand = "orbita setup"
+    $runCommand = "orbita run"
 }
 
 # ── 4. Cria o lançador sem janela (%APPDATA%\Orbita\orbita.vbs) ──
@@ -102,13 +117,27 @@ Write-Host @"
 
    Próximo passo — configure o Orbita:
 
-     orbita setup
+     $setupCommand
 
    Para iniciar sem janela:
      Clique duas vezes em Orbita.lnk
      na área de trabalho.
 
    Para iniciar pelo terminal:
-     orbita run
+     $runCommand
   ══════════════════════════════════════
 "@ -ForegroundColor Green
+
+$runSetupNow = Read-Host "`n  Deseja executar a configuração agora? [S/n]"
+if ($runSetupNow -eq "" -or $runSetupNow -match "^[Ss]") {
+    Write-Step "Abrindo configuração do Orbita..."
+    if ($orbita -or (Test-Path $orbitaExePath)) {
+        if ($orbita) {
+            & orbita setup
+        } else {
+            & $orbitaExePath setup
+        }
+    } else {
+        & python -m orbita.cli setup
+    }
+}

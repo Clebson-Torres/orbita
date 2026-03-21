@@ -157,3 +157,6 @@ def test_install_script_uses_current_repository_url():
 
     assert "https://github.com/Clebson-Torres/orbita.git" in install_script
     assert "clebsonpy/orbita" not in install_script
+    assert "--no-warn-script-location" in install_script
+    assert "python -m orbita.cli setup" in install_script
+    assert "Deseja executar a configuração agora?" in install_script
