@@ -9,7 +9,8 @@ Envie mensagens pelo celular e o Orbita executa ações no seu computador — ab
 Abra o PowerShell e cole:
 
 ```powershell
-irm https://raw.githubusercontent.com/clebsonpy/orbita/main/install.ps1 | iex
+irm https://raw.githubusercontent.com/Clebson-Torres/orbita/main/install.ps1 | iex
+
 ```
 
 O instalador:
