@@ -80,8 +80,13 @@ def _mask(key: str, value: str) -> str:
 
 
 def _ok(result: dict[str, Any]) -> None:
-    state = "OK  " if result.get("ok") else "FAIL"
-    typer.echo(f"  {state} {result.get('name', '?'):12s} {result.get('message', '')}")
+    if result.get("ok"):
+        state = "OK"
+    elif result.get("status") == "auth_required":
+        state = "AUTH"
+    else:
+        state = "FAIL"
+    typer.echo(f"  {state:<4} {result.get('name', '?'):12s} {result.get('message', '')}")
 
 
 def _section(title: str) -> None:
@@ -118,6 +123,22 @@ def _choose_model(default: str, models: list[str]) -> str:
     return typer.prompt("  Modelo a usar", default=best_default)
 
 
+def _suggest_default_backend(
+    existing_default: str,
+    lmstudio_result: dict[str, Any],
+    ollama_result: dict[str, Any],
+) -> str:
+    if existing_default == "ollama":
+        return "ollama"
+    if existing_default == "lmstudio" and lmstudio_result.get("ok"):
+        return "lmstudio"
+    if lmstudio_result.get("ok"):
+        return "lmstudio"
+    if ollama_result.get("ok"):
+        return "ollama"
+    return existing_default or "ollama"
+
+
 def _resolve_lmstudio_token(existing: dict[str, str], lmstudio_url: str) -> tuple[str, dict[str, Any]]:
     api_token = existing.get("LMSTUDIO_API_TOKEN", "")
     result = probe_lmstudio(lmstudio_url, api_token)
@@ -132,6 +153,8 @@ def _resolve_lmstudio_token(existing: dict[str, str], lmstudio_url: str) -> tupl
         hide_input=True,
     ).strip()
     result = probe_lmstudio(lmstudio_url, api_token)
+    if result.get("status") == "auth_required":
+        typer.echo("  Continuando sem validar o LM Studio agora. Voce pode configurar esse token depois no .env.")
     return api_token, result
 
 
@@ -232,7 +255,16 @@ def setup(
 
     typer.echo("\n  Envie qualquer mensagem para o seu bot agora.")
     typer.echo("  Vou detectar o seu user_id automaticamente (aguardo 60 s)...\n")
-    discovered = _run(discover_telegram_user_async(token, timeout_seconds=60))
+    try:
+        discovered = _run(discover_telegram_user_async(token, timeout_seconds=60))
+    except Exception as exc:
+        if "409" in str(exc):
+            typer.echo("  AVISO: O bot ja esta rodando em outro processo (erro 409).")
+            typer.echo("         Encerre-o antes do setup: Get-Process pythonw | Stop-Process -Force")
+            typer.echo("         Continuando sem deteccao automatica...\n")
+        else:
+            typer.echo(f"  AVISO: Falha na deteccao automatica: {type(exc).__name__}")
+        discovered = None
     if discovered:
         allowed_user_id = str(discovered["user_id"])
         typer.echo(f"  OK   user_id       {allowed_user_id} detectado automaticamente")
@@ -294,9 +326,14 @@ def setup(
     ollama_result = probe_ollama(ollama_url)
     _ok(ollama_result)
     ollama_model = typer.prompt("  Modelo Ollama", default=existing.get("OLLAMA_MODEL", "qwen3:4b"))
+    backend_default = _suggest_default_backend(
+        existing.get("BOT_DEFAULT_BACKEND", ""),
+        lm_result,
+        ollama_result,
+    )
     default_backend = typer.prompt(
         "  Backend padrão (lmstudio/ollama)",
-        default=existing.get("BOT_DEFAULT_BACKEND", "ollama"),
+        default=backend_default,
     )
 
     # ── Grava .env ────────────────────────────────────────────────

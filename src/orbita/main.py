@@ -17,13 +17,12 @@ def _setup_logging(data_dir: Path) -> None:
     handlers: list[logging.Handler] = [
         logging.FileHandler(log_file, encoding="utf-8"),
     ]
-    # Só adiciona StreamHandler se houver console disponível
-    if sys.stdout and sys.stdout.fileno() >= 0:
-        try:
-            sys.stdout.fileno()
+    # Só adiciona StreamHandler se houver console disponível (não pythonw)
+    try:
+        if sys.stdout and sys.stdout.fileno() >= 0:
             handlers.append(logging.StreamHandler(sys.stdout))
-        except Exception:
-            pass
+    except Exception:
+        pass  # pythonw, service, ou redirect — sem console, tudo vai pro arquivo
 
     logging.basicConfig(
         level=logging.INFO,

@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import importlib.util
 import json
@@ -112,7 +112,8 @@ async def probe_lmstudio(base_url: str, api_token: str = "") -> dict[str, Any]:
                     "name": "lmstudio",
                     "ok": False,
                     "code": 401,
-                    "message": "LM Studio requer autenticacao por token. Use Server Settings > Manage Tokens.",
+                    "status": "auth_required",
+                    "message": "LM Studio online, mas requer API token. Use Server Settings > Manage Tokens.",
                     "models": [],
                 }
             return {
