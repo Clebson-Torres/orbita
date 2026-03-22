@@ -130,7 +130,7 @@ Write-Host @"
 
 $ans2 = Read-Host "  Deseja executar 'orbita setup' agora neste terminal? [S/n]"
 if ($ans2 -eq "" -or $ans2 -match "^[Ss]") {
-    if (Test-Path $orbitaExePath) {
+    if ($orbitaExePath -and (Test-Path $orbitaExePath)) {
         & $orbitaExePath setup
     } else {
         & python -m orbita.cli setup

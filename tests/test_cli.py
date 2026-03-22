@@ -371,5 +371,6 @@ def test_install_script_uses_current_repository_url():
     assert "--no-warn-script-location" in install_script
     assert "site.getuserbase()" in install_script
     assert "$userScriptsPath" in install_script
+    assert '$orbitaExePath -and (Test-Path $orbitaExePath)' in install_script
     assert "python -m orbita.cli setup" in install_script
     assert "Deseja executar 'orbita setup' agora neste terminal?" in install_script
