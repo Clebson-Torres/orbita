@@ -10,7 +10,7 @@ from unittest.mock import AsyncMock, patch
 
 from typer.testing import CliRunner
 
-from orbita.cli import _choose_model, _suggest_default_backend, app
+from orbita.cli import _choose_model, _resolve_lmstudio_token, _suggest_default_backend, app
 
 
 # ------------------------------------------------------------------
@@ -206,6 +206,37 @@ def test_setup_prompts_for_lmstudio_token_after_401(tmp_path: Path):
     assert probe_mock.call_args_list[1].args == ("http://127.0.0.1:1234", "lmstudio-token-123")
 
 
+def test_resolve_lmstudio_token_uses_visible_prompt_for_windows_shells():
+    unauthorized = {
+        "name": "lmstudio",
+        "ok": False,
+        "code": 401,
+        "status": "auth_required",
+        "message": "LM Studio online, mas requer API token.",
+        "models": [],
+    }
+    ok_result = {
+        "name": "lmstudio",
+        "ok": True,
+        "message": "LM Studio online",
+        "models": ["qwen3:4b"],
+    }
+
+    with (
+        patch("orbita.cli.probe_lmstudio", side_effect=[unauthorized, ok_result]),
+        patch("orbita.cli.typer.prompt", return_value="lmstudio-token-789") as prompt_mock,
+    ):
+        token, result = _resolve_lmstudio_token({}, "http://127.0.0.1:1234")
+
+    assert token == "lmstudio-token-789"
+    assert result == ok_result
+    prompt_mock.assert_called_once_with(
+        "  LM Studio API token",
+        default="",
+        hide_input=False,
+    )
+
+
 def test_setup_overwrites_empty_lmstudio_token_when_preserving_existing_env(tmp_path: Path):
     env_path = tmp_path / ".env"
     env_path.write_text(
@@ -338,5 +369,7 @@ def test_install_script_uses_current_repository_url():
     assert "https://github.com/Clebson-Torres/orbita.git" in install_script
     assert "clebsonpy/orbita" not in install_script
     assert "--no-warn-script-location" in install_script
+    assert "site.getuserbase()" in install_script
+    assert "$userScriptsPath" in install_script
     assert "python -m orbita.cli setup" in install_script
     assert "Deseja executar 'orbita setup' agora neste terminal?" in install_script
